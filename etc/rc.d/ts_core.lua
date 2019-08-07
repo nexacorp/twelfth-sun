@@ -12,6 +12,7 @@ function start()
 	th = thread.create(function()
 		local status = "unknown"
 		local criticalSaturation = false
+		local criticalField = false
 		while true do
 			local info = reactor.getReactorInfo()
 			if info.status ~= status then
@@ -25,6 +26,14 @@ function start()
 			if info.energySaturation < 200000000 and criticalSaturation then
 				event.push("saturation_alert", "normal")
 				criticalSaturation = false
+			end
+			if info.fieldStrength < 10000000 and not criticalField then
+				event.push("field_alert", "critical")
+				criticalField = true
+			end
+			if info.fieldStrength >= 10000000 and criticalField then
+				event.push("field_alert", "normal")
+				criticalField = false
 			end
 			
 			os.sleep(0.1)
