@@ -4,14 +4,21 @@ local component = require("component")
 local event = require("event")
 local reactor = component.draconic_reactor
 
-local outputRedstone = nil
-local inputRedstone = nil
+local outputRedstone = nil -- redstone block for energy output (connected to flux gate)
+local inputRedstone = nil -- redstone block energy input (connected to energy injector flux gate)
 
 local th = nil
 
-local function output(signal)
+local function outputRed(signal)
 	for i=0,5 do
-		
+		outputRedstone.setOutput(i, signal)
+	end
+end
+
+local function inputRed(signal)
+	for i=0,5 do
+		inputRedstone.setOutput(i, signal)
+	end
 end
 
 function start()
