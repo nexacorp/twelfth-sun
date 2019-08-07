@@ -50,11 +50,9 @@ local function configAutodetect()
 		cfg = configAutodetect()
 	else
 		print("Sucesfully configured Twelfth Sun!")
+		cfg.input = inputGate
+		cfg.output = outputGate
 	end
-	cfg.input = inputGate
-	cfg.output = outputGate
-	component.proxy(inputGate).setSignalLowFlow(0)
-	component.proxy(outputGate).setSignalLowFlow(0)
 	return cfg
 end
 
@@ -67,11 +65,6 @@ function start(cfg)
 		io.stderr:write("\"Twelfth Sun: Control\" is already running!\n")
 		return
 	end
-	if cfg then
-		if component.get(cfg.input) == nil or component.get(cfg.output) == nil then
-			cfg = nil
-		end
-	end
 	if not cfg then
 		cfg = configAutodetect()
 		local stream = io.open("/etc/rc.cfg", "a")
@@ -82,18 +75,46 @@ function start(cfg)
 	inFlux = component.proxy(cfg.input)
 	th = thread.create(function()
 		local status = reactor.getReactorInfo().status
+		local normalOutput = true
 		while true do
-			local name, a, b, c = event.pull()
+			local info = reactor.getReactorInfo()
+			local name, a, b, c = event.pull(0.1)
 			if name == "reactor_new_status" then
 				status = a
 			end
 			if status == "cold" then
-				
+				reactor.chargeReactor()
+			end
+			if status == "warming_up" then
+				if info.temperature < 2000 then
+					inFlux.setSignalLowFlow(100000) -- input RF to power, but not too much
+					outFlux.setSignalLowFlow(0)
+				else -- reactor can be activated
+					reactor.activateReactor()
+				end
 			end
 			if status == "running" then
+				inFlux.setSignalLowFlow(20000)
+				if normalOutput then
+					outFlux.setSignalLowFlow(info.generationRate)
+				end
 				if name == "saturation_alert" then
+					if a == "high" then
+						outFlux.setSignalLowFlow(200000)
+						normalOutput = false
+					elseif a == "normal" then
+						outFlux.setSignalLowFlow(50000)
+						normalOutput = true
+					elseif a == "low" then
+						outFlux.setSignalLowFlow(0)
+						normalOutput = false
+					end
+				end
+				if name == "field_alert" then
 					if a == "critical" then
-						
+						inFlux.setSignalLowFlow(info.fieldDrainRate*5)
+					else
+						inFlux.setSignalLowFlow(info.fieldDrainRate)
 					end
 				end
 			end
